@@ -100,6 +100,42 @@ func TestTokenStore(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(rinfo, ShouldBeNil)
 		})
+
+		Convey("Test user id store", func() {
+			info := &models.Token{
+				ClientID:         "1",
+				UserID:           "1_3",
+				RedirectURI:      "http://localhost/",
+				Scope:            "all",
+				Access:           "1_3_1",
+				AccessCreateAt:   time.Now(),
+				AccessExpiresIn:  time.Second * 5,
+				Refresh:          "1_3_2",
+				RefreshCreateAt:  time.Now(),
+				RefreshExpiresIn: time.Second * 15,
+			}
+			err := store.Create(info)
+			So(err, ShouldBeNil)
+
+			rinfo, err := store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(rinfo.GetUserID(), ShouldEqual, info.GetUserID())
+
+			err = store.RemoveByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+
+			rinfo, err = store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(rinfo, ShouldBeNil)
+
+			rinfo, err = store.GetByAccess(info.GetAccess())
+			So(err, ShouldBeNil)
+			So(rinfo, ShouldBeNil)
+
+			rinfo, err = store.GetByRefresh(info.GetRefresh())
+			So(err, ShouldBeNil)
+			So(rinfo, ShouldBeNil)
+		})
 	})
 }
 
@@ -185,6 +221,42 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			rinfo, err = store.GetByRefresh(info.GetRefresh())
+			So(err, ShouldBeNil)
+			So(rinfo, ShouldBeNil)
+		})
+
+		Convey("Test user id store", func() {
+			info := &models.Token{
+				ClientID:         "1",
+				UserID:           "1_3",
+				RedirectURI:      "http://localhost/",
+				Scope:            "all",
+				Access:           "1_3_1",
+				AccessCreateAt:   time.Now(),
+				AccessExpiresIn:  time.Second * 5,
+				Refresh:          "1_3_2",
+				RefreshCreateAt:  time.Now(),
+				RefreshExpiresIn: time.Second * 15,
+			}
+			err := store.Create(info)
+			So(err, ShouldBeNil)
+
+			rinfo, err := store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(rinfo.GetUserID(), ShouldEqual, info.GetUserID())
+
+			err = store.RemoveByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+
+			rinfo, err = store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(rinfo, ShouldBeNil)
+
+			rinfo, err = store.GetByRefresh(info.GetRefresh())
+			So(err, ShouldBeNil)
+			So(rinfo, ShouldBeNil)
+
+			rinfo, err = store.GetByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
 			So(rinfo, ShouldBeNil)
 		})

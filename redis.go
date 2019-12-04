@@ -57,6 +57,12 @@ func NewRedisClusterStoreWithCli(cli *redis.ClusterClient, keyNamespace ...strin
 	return store
 }
 
+type ExtendedTokenStore interface {
+	GetByUID(uid string) (oauth2.TokenInfo, error)
+	RemoveByUID(uid string) error
+	oauth2.TokenStore
+}
+
 type clienter interface {
 	Get(key string) *redis.StringCmd
 	Exists(key ...string) *redis.IntCmd
@@ -196,6 +202,7 @@ func (s *TokenStore) Create(info oauth2.TokenInfo) error {
 			pipe.Set(s.wrapperKey(refresh), basicID, rexp)
 		}
 
+		pipe.Set(s.wrapperKey(info.GetUserID()), basicID, aexp)
 		pipe.Set(s.wrapperKey(info.GetAccess()), basicID, aexp)
 		pipe.Set(s.wrapperKey(basicID), jv, rexp)
 	}
@@ -242,4 +249,52 @@ func (s *TokenStore) GetByRefresh(refresh string) (oauth2.TokenInfo, error) {
 		return nil, err
 	}
 	return s.getToken(basicID)
+}
+
+// GetByUID Use the user id for token information data
+func (s *TokenStore) GetByUID(uid string) (oauth2.TokenInfo, error) {
+	basicID, err := s.getBasicID(uid)
+	if err != nil || basicID == "" {
+		return nil, err
+	}
+	return s.getToken(basicID)
+}
+
+// RemoveByUID Use the user id to delete the token information
+func (s *TokenStore) RemoveByUID(uid string) error {
+	basicID, err := s.getBasicID(uid)
+	if err != nil {
+		return err
+	} else if basicID == "" {
+		return nil
+	}
+
+	err = s.remove(uid)
+	if err != nil {
+		return err
+	}
+
+	token, err := s.getToken(basicID)
+	if err != nil {
+		return err
+	} else if token == nil {
+		return nil
+	}
+
+	err = s.remove(token.GetRefresh())
+	if err != nil {
+		return err
+	}
+
+	err = s.remove(token.GetAccess())
+	if err != nil {
+		return err
+	}
+
+	err = s.remove(basicID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
