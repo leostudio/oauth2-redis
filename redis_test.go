@@ -12,7 +12,7 @@ import (
 
 const (
 	addr = "localhost:6379"
-	db   = 15
+	db   = 1
 )
 
 func TestTokenStore(t *testing.T) {
@@ -31,21 +31,21 @@ func TestTokenStore(t *testing.T) {
 				Scope:         "all",
 				Code:          "11_11_11",
 				CodeCreateAt:  time.Now(),
-				CodeExpiresIn: time.Second * 5,
+				CodeExpiresIn: time.Minute * 5,
 			}
 			err := store.Create(info)
 			So(err, ShouldBeNil)
 
-			cinfo, err := store.GetByCode(info.Code)
+			cInfo, err := store.GetByCode(info.Code)
 			So(err, ShouldBeNil)
-			So(cinfo.GetUserID(), ShouldEqual, info.UserID)
+			So(cInfo.GetUserID(), ShouldEqual, info.UserID)
 
 			err = store.RemoveByCode(info.Code)
 			So(err, ShouldBeNil)
 
-			cinfo, err = store.GetByCode(info.Code)
+			cInfo, err = store.GetByCode(info.Code)
 			So(err, ShouldBeNil)
-			So(cinfo, ShouldBeNil)
+			So(cInfo, ShouldBeNil)
 		})
 
 		Convey("Test access token store", func() {
@@ -61,16 +61,25 @@ func TestTokenStore(t *testing.T) {
 			err := store.Create(info)
 			So(err, ShouldBeNil)
 
-			ainfo, err := store.GetByAccess(info.GetAccess())
+			aInfo, err := store.GetByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
-			So(ainfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(aInfo.GetUserID(), ShouldEqual, info.GetUserID())
+
+			uInfos, err := store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(uInfos, ShouldHaveLength, 1)
+			So(uInfos[0].GetAccess(), ShouldEqual, info.GetAccess())
 
 			err = store.RemoveByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
 
-			ainfo, err = store.GetByAccess(info.GetAccess())
+			aInfo, err = store.GetByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
-			So(ainfo, ShouldBeNil)
+			So(aInfo, ShouldBeNil)
+
+			uInfos, err = store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(uInfos, ShouldBeEmpty)
 		})
 
 		Convey("Test refresh token store", func() {
@@ -89,16 +98,36 @@ func TestTokenStore(t *testing.T) {
 			err := store.Create(info)
 			So(err, ShouldBeNil)
 
-			rinfo, err := store.GetByRefresh(info.GetRefresh())
+			rInfo, err := store.GetByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
-			So(rinfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(rInfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(rInfo.GetAccess(), ShouldEqual, info.GetAccess())
+
+			aInfo, err := store.GetByAccess(info.GetAccess())
+			So(err, ShouldBeNil)
+			So(aInfo.GetRefresh(), ShouldEqual, info.GetRefresh())
+			So(aInfo.GetUserID(), ShouldEqual, info.GetUserID())
+
+			uInfos, err := store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(uInfos, ShouldHaveLength, 1)
+			So(uInfos[0].GetAccess(), ShouldEqual, info.GetAccess())
+			So(uInfos[0].GetRefresh(), ShouldEqual, info.GetRefresh())
 
 			err = store.RemoveByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
 
-			rinfo, err = store.GetByRefresh(info.GetRefresh())
+			rInfo, err = store.GetByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
-			So(rinfo, ShouldBeNil)
+			So(rInfo, ShouldBeNil)
+
+			aInfo, err = store.GetByAccess(info.GetAccess())
+			So(err, ShouldBeNil)
+			So(aInfo, ShouldNotBeNil)
+
+			uInfos, err = store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(uInfos, ShouldHaveLength, 1)
 		})
 
 		Convey("Test user id store", func() {
@@ -117,24 +146,36 @@ func TestTokenStore(t *testing.T) {
 			err := store.Create(info)
 			So(err, ShouldBeNil)
 
-			rinfo, err := store.GetByUID(info.GetUserID())
+			uInfos, err := store.GetByUID(info.GetUserID())
 			So(err, ShouldBeNil)
-			So(rinfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(uInfos, ShouldHaveLength, 1)
+			So(uInfos[0].GetAccess(), ShouldEqual, info.GetAccess())
+			So(uInfos[0].GetRefresh(), ShouldEqual, info.GetRefresh())
+
+			rInfo, err := store.GetByRefresh(info.GetRefresh())
+			So(err, ShouldBeNil)
+			So(rInfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(rInfo.GetAccess(), ShouldEqual, info.GetAccess())
+
+			aInfo, err := store.GetByAccess(info.GetAccess())
+			So(err, ShouldBeNil)
+			So(aInfo.GetRefresh(), ShouldEqual, info.GetRefresh())
+			So(aInfo.GetUserID(), ShouldEqual, info.GetUserID())
 
 			err = store.RemoveByUID(info.GetUserID())
 			So(err, ShouldBeNil)
 
-			rinfo, err = store.GetByUID(info.GetUserID())
+			uInfos, err = store.GetByUID(info.GetUserID())
 			So(err, ShouldBeNil)
-			So(rinfo, ShouldBeNil)
+			So(uInfos, ShouldBeEmpty)
 
-			rinfo, err = store.GetByAccess(info.GetAccess())
+			aInfo, err = store.GetByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
-			So(rinfo, ShouldBeNil)
+			So(aInfo, ShouldBeNil)
 
-			rinfo, err = store.GetByRefresh(info.GetRefresh())
+			rInfo, err = store.GetByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
-			So(rinfo, ShouldBeNil)
+			So(rInfo, ShouldBeNil)
 		})
 	})
 }
@@ -160,16 +201,16 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			err := store.Create(info)
 			So(err, ShouldBeNil)
 
-			cinfo, err := store.GetByCode(info.Code)
+			cInfo, err := store.GetByCode(info.Code)
 			So(err, ShouldBeNil)
-			So(cinfo.GetUserID(), ShouldEqual, info.UserID)
+			So(cInfo.GetUserID(), ShouldEqual, info.UserID)
 
 			err = store.RemoveByCode(info.Code)
 			So(err, ShouldBeNil)
 
-			cinfo, err = store.GetByCode(info.Code)
+			cInfo, err = store.GetByCode(info.Code)
 			So(err, ShouldBeNil)
-			So(cinfo, ShouldBeNil)
+			So(cInfo, ShouldBeNil)
 		})
 
 		Convey("Test access token store", func() {
@@ -185,16 +226,25 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			err := store.Create(info)
 			So(err, ShouldBeNil)
 
-			ainfo, err := store.GetByAccess(info.GetAccess())
+			aInfo, err := store.GetByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
-			So(ainfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(aInfo.GetUserID(), ShouldEqual, info.GetUserID())
+
+			uInfos, err := store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(uInfos, ShouldHaveLength, 1)
+			So(uInfos[0].GetAccess(), ShouldEqual, info.GetAccess())
 
 			err = store.RemoveByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
 
-			ainfo, err = store.GetByAccess(info.GetAccess())
+			aInfo, err = store.GetByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
-			So(ainfo, ShouldBeNil)
+			So(aInfo, ShouldBeNil)
+
+			uInfos, err = store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(uInfos, ShouldBeEmpty)
 		})
 
 		Convey("Test refresh token store", func() {
@@ -213,16 +263,36 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			err := store.Create(info)
 			So(err, ShouldBeNil)
 
-			rinfo, err := store.GetByRefresh(info.GetRefresh())
+			rInfo, err := store.GetByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
-			So(rinfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(rInfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(rInfo.GetAccess(), ShouldEqual, info.GetAccess())
+
+			aInfo, err := store.GetByAccess(info.GetAccess())
+			So(err, ShouldBeNil)
+			So(aInfo.GetRefresh(), ShouldEqual, info.GetRefresh())
+			So(aInfo.GetUserID(), ShouldEqual, info.GetUserID())
+
+			uInfos, err := store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(uInfos, ShouldHaveLength, 1)
+			So(uInfos[0].GetAccess(), ShouldEqual, info.GetAccess())
+			So(uInfos[0].GetRefresh(), ShouldEqual, info.GetRefresh())
 
 			err = store.RemoveByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
 
-			rinfo, err = store.GetByRefresh(info.GetRefresh())
+			rInfo, err = store.GetByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
-			So(rinfo, ShouldBeNil)
+			So(rInfo, ShouldBeNil)
+
+			aInfo, err = store.GetByAccess(info.GetAccess())
+			So(err, ShouldBeNil)
+			So(aInfo, ShouldNotBeNil)
+
+			uInfos, err = store.GetByUID(info.GetUserID())
+			So(err, ShouldBeNil)
+			So(uInfos, ShouldHaveLength, 1)
 		})
 
 		Convey("Test user id store", func() {
@@ -241,24 +311,36 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			err := store.Create(info)
 			So(err, ShouldBeNil)
 
-			rinfo, err := store.GetByUID(info.GetUserID())
+			uInfos, err := store.GetByUID(info.GetUserID())
 			So(err, ShouldBeNil)
-			So(rinfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(uInfos, ShouldHaveLength, 1)
+			So(uInfos[0].GetAccess(), ShouldEqual, info.GetAccess())
+			So(uInfos[0].GetRefresh(), ShouldEqual, info.GetRefresh())
+
+			rInfo, err := store.GetByRefresh(info.GetRefresh())
+			So(err, ShouldBeNil)
+			So(rInfo.GetUserID(), ShouldEqual, info.GetUserID())
+			So(rInfo.GetAccess(), ShouldEqual, info.GetAccess())
+
+			aInfo, err := store.GetByAccess(info.GetAccess())
+			So(err, ShouldBeNil)
+			So(aInfo.GetRefresh(), ShouldEqual, info.GetRefresh())
+			So(aInfo.GetUserID(), ShouldEqual, info.GetUserID())
 
 			err = store.RemoveByUID(info.GetUserID())
 			So(err, ShouldBeNil)
 
-			rinfo, err = store.GetByUID(info.GetUserID())
+			uInfos, err = store.GetByUID(info.GetUserID())
 			So(err, ShouldBeNil)
-			So(rinfo, ShouldBeNil)
+			So(uInfos, ShouldBeEmpty)
 
-			rinfo, err = store.GetByRefresh(info.GetRefresh())
+			aInfo, err = store.GetByAccess(info.GetAccess())
 			So(err, ShouldBeNil)
-			So(rinfo, ShouldBeNil)
+			So(aInfo, ShouldBeNil)
 
-			rinfo, err = store.GetByAccess(info.GetAccess())
+			rInfo, err = store.GetByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
-			So(rinfo, ShouldBeNil)
+			So(rInfo, ShouldBeNil)
 		})
 	})
 }

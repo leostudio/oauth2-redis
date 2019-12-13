@@ -58,7 +58,7 @@ func NewRedisClusterStoreWithCli(cli *redis.ClusterClient, keyNamespace ...strin
 }
 
 type ExtendedTokenStore interface {
-	GetByUID(uid string) (oauth2.TokenInfo, error)
+	GetByUID(uid string) ([]oauth2.TokenInfo, error)
 	RemoveByUID(uid string) error
 	oauth2.TokenStore
 }
@@ -67,6 +67,7 @@ type clienter interface {
 	Get(key string) *redis.StringCmd
 	Exists(key ...string) *redis.IntCmd
 	TxPipeline() redis.Pipeliner
+	Scan(cursor uint64, match string, count int64) *redis.ScanCmd
 	Del(keys ...string) *redis.IntCmd
 	Close() error
 }
@@ -131,6 +132,13 @@ func (s *TokenStore) removeToken(tokenString string, isRefresh bool) error {
 	if err := iresult.Err(); err != nil && err != redis.Nil {
 		return err
 	} else if iresult.Val() == 0 {
+		// remove uid key
+
+		delResult := s.cli.Del(s.wrapperUIDKey(token.GetUserID(), basicID))
+		if _, err := s.checkError(delResult); err != nil {
+			return err
+		}
+
 		return s.remove(basicID)
 	}
 
@@ -202,7 +210,7 @@ func (s *TokenStore) Create(info oauth2.TokenInfo) error {
 			pipe.Set(s.wrapperKey(refresh), basicID, rexp)
 		}
 
-		pipe.Set(s.wrapperKey(info.GetUserID()), basicID, aexp)
+		pipe.Set(s.wrapperUIDKey(info.GetUserID(), basicID), basicID, aexp)
 		pipe.Set(s.wrapperKey(info.GetAccess()), basicID, aexp)
 		pipe.Set(s.wrapperKey(basicID), jv, rexp)
 	}
@@ -225,7 +233,7 @@ func (s *TokenStore) RemoveByAccess(access string) error {
 
 // RemoveByRefresh Use the refresh token to delete the token information
 func (s *TokenStore) RemoveByRefresh(refresh string) error {
-	return s.removeToken(refresh, false)
+	return s.removeToken(refresh, true)
 }
 
 // GetByCode Use the authorization code for token information data
@@ -252,49 +260,90 @@ func (s *TokenStore) GetByRefresh(refresh string) (oauth2.TokenInfo, error) {
 }
 
 // GetByUID Use the user id for token information data
-func (s *TokenStore) GetByUID(uid string) (oauth2.TokenInfo, error) {
-	basicID, err := s.getBasicID(uid)
-	if err != nil || basicID == "" {
-		return nil, err
+func (s *TokenStore) GetByUID(uid string) ([]oauth2.TokenInfo, error) {
+	var cursor uint64
+	var result []oauth2.TokenInfo
+	for {
+		var keys []string
+		var err error
+		keys, cursor, err = s.cli.Scan(cursor, s.getUIDKeyPattern(uid), 10).Result()
+		if err != nil {
+			return nil, err
+		}
+		for _, k := range keys {
+			basicID, err := s.parseBasicID(s.cli.Get(k))
+			if err != nil {
+				return nil, err
+			}
+			token, err := s.getToken(basicID)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, token)
+		}
+		if cursor == 0 {
+			break
+		}
 	}
-	return s.getToken(basicID)
+
+	return result, nil
 }
 
 // RemoveByUID Use the user id to delete the token information
 func (s *TokenStore) RemoveByUID(uid string) error {
-	basicID, err := s.getBasicID(uid)
-	if err != nil {
-		return err
-	} else if basicID == "" {
-		return nil
-	}
+	var cursor uint64
+	for {
+		var keys []string
+		var err error
+		keys, cursor, err = s.cli.Scan(cursor, s.getUIDKeyPattern(uid), 10).Result()
+		if err != nil {
+			return err
+		}
+		for _, k := range keys {
+			basicID, err := s.parseBasicID(s.cli.Get(k))
+			if err != nil {
+				return err
+			}
 
-	err = s.remove(uid)
-	if err != nil {
-		return err
-	}
+			_, err = s.checkError(s.cli.Del(k))
+			if err != nil {
+				return err
+			}
 
-	token, err := s.getToken(basicID)
-	if err != nil {
-		return err
-	} else if token == nil {
-		return nil
-	}
+			token, err := s.getToken(basicID)
+			if err != nil {
+				return err
+			} else if token == nil {
+				return nil
+			}
 
-	err = s.remove(token.GetRefresh())
-	if err != nil {
-		return err
-	}
+			err = s.remove(token.GetRefresh())
+			if err != nil {
+				return err
+			}
 
-	err = s.remove(token.GetAccess())
-	if err != nil {
-		return err
-	}
+			err = s.remove(token.GetAccess())
+			if err != nil {
+				return err
+			}
 
-	err = s.remove(basicID)
-	if err != nil {
-		return err
+			err = s.remove(basicID)
+			if err != nil {
+				return err
+			}
+		}
+		if cursor == 0 {
+			break
+		}
 	}
 
 	return nil
+}
+
+func (s *TokenStore) wrapperUIDKey(uid, basicID string) string {
+	return fmt.Sprintf("%suid:%s:%s", s.ns, uid, basicID)
+}
+
+func (s *TokenStore) getUIDKeyPattern(uid string) string {
+	return fmt.Sprintf("%suid:%s:*", s.ns, uid)
 }
