@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Ankr-network/kit/auth"
 	"github.com/go-redis/redis"
 	jsoniter "github.com/json-iterator/go"
 	"gopkg.in/oauth2.v3"
@@ -31,9 +32,12 @@ func NewRedisStoreWithCli(cli *redis.Client, keyNamespace ...string) *TokenStore
 		cli: cli,
 	}
 
+	blPrefix := "blacklist:"
 	if len(keyNamespace) > 0 {
 		store.ns = keyNamespace[0]
+		blPrefix = fmt.Sprintf("%sblacklist:", store.ns)
 	}
+	store.bl = auth.NewRedisBlacklist(cli, auth.WithPrefix(blPrefix))
 	return store
 }
 
@@ -51,24 +55,25 @@ func NewRedisClusterStoreWithCli(cli *redis.ClusterClient, keyNamespace ...strin
 		cli: cli,
 	}
 
+	blPrefix := "blacklist:"
 	if len(keyNamespace) > 0 {
 		store.ns = keyNamespace[0]
+		blPrefix = fmt.Sprintf("%sblacklist:", store.ns)
 	}
+	store.bl = auth.NewRedisBlacklist(cli, auth.WithPrefix(blPrefix))
+
 	return store
 }
 
 type ExtendedTokenStore interface {
 	GetByUID(uid string) ([]oauth2.TokenInfo, error)
 	RemoveByUID(uid string) error
+	GetBlacklist() auth.Blacklist
 	oauth2.TokenStore
 }
 
 type clienter interface {
-	Get(key string) *redis.StringCmd
-	Exists(key ...string) *redis.IntCmd
-	TxPipeline() redis.Pipeliner
-	Scan(cursor uint64, match string, count int64) *redis.ScanCmd
-	Del(keys ...string) *redis.IntCmd
+	redis.Cmdable
 	Close() error
 }
 
@@ -76,6 +81,7 @@ type clienter interface {
 type TokenStore struct {
 	cli clienter
 	ns  string
+	bl  auth.Blacklist
 }
 
 // Close close the store
@@ -122,6 +128,12 @@ func (s *TokenStore) removeToken(tokenString string, isRefresh bool) error {
 		return err
 	} else if token == nil {
 		return nil
+	}
+
+	if !isRefresh {
+		if err := s.bl.PutAccess(tokenString, token.GetAccessCreateAt(), token.GetAccessExpiresIn()); err != nil {
+			return err
+		}
 	}
 
 	checkToken := token.GetRefresh()
@@ -326,6 +338,9 @@ func (s *TokenStore) RemoveByUID(uid string) error {
 			if err != nil {
 				return err
 			}
+			if err := s.bl.PutAccess(token.GetAccess(), token.GetAccessCreateAt(), token.GetAccessExpiresIn()); err != nil {
+				return err
+			}
 
 			err = s.remove(basicID)
 			if err != nil {
@@ -338,6 +353,10 @@ func (s *TokenStore) RemoveByUID(uid string) error {
 	}
 
 	return nil
+}
+
+func (s *TokenStore) GetBlacklist() auth.Blacklist {
+	return s.bl
 }
 
 func (s *TokenStore) wrapperUIDKey(uid, basicID string) string {

@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"github.com/Ankr-network/kit/auth"
 	"testing"
 	"time"
 
@@ -80,6 +81,9 @@ func TestTokenStore(t *testing.T) {
 			uInfos, err = store.GetByUID(info.GetUserID())
 			So(err, ShouldBeNil)
 			So(uInfos, ShouldBeEmpty)
+
+			err = store.GetBlacklist().CheckAccess(info.GetAccess())
+			So(err, ShouldEqual, auth.ErrExpiredAccess)
 		})
 
 		Convey("Test refresh token store", func() {
@@ -128,6 +132,9 @@ func TestTokenStore(t *testing.T) {
 			uInfos, err = store.GetByUID(info.GetUserID())
 			So(err, ShouldBeNil)
 			So(uInfos, ShouldHaveLength, 1)
+
+			err = store.GetBlacklist().CheckAccess(info.GetAccess())
+			So(err, ShouldBeNil)
 		})
 
 		Convey("Test user id store", func() {
@@ -176,6 +183,9 @@ func TestTokenStore(t *testing.T) {
 			rInfo, err = store.GetByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
 			So(rInfo, ShouldBeNil)
+
+			err = store.GetBlacklist().CheckAccess(info.GetAccess())
+			So(err, ShouldEqual, auth.ErrExpiredAccess)
 		})
 	})
 }
@@ -245,6 +255,9 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			uInfos, err = store.GetByUID(info.GetUserID())
 			So(err, ShouldBeNil)
 			So(uInfos, ShouldBeEmpty)
+
+			err = store.GetBlacklist().CheckAccess(info.GetAccess())
+			So(err, ShouldEqual, auth.ErrExpiredAccess)
 		})
 
 		Convey("Test refresh token store", func() {
@@ -293,6 +306,9 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			uInfos, err = store.GetByUID(info.GetUserID())
 			So(err, ShouldBeNil)
 			So(uInfos, ShouldHaveLength, 1)
+
+			err = store.GetBlacklist().CheckAccess(info.GetAccess())
+			So(err, ShouldBeNil)
 		})
 
 		Convey("Test user id store", func() {
@@ -341,6 +357,9 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			rInfo, err = store.GetByRefresh(info.GetRefresh())
 			So(err, ShouldBeNil)
 			So(rInfo, ShouldBeNil)
+
+			err = store.GetBlacklist().CheckAccess(info.GetAccess())
+			So(err, ShouldEqual, auth.ErrExpiredAccess)
 		})
 	})
 }
