@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"github.com/Ankr-network/kit/auth"
+	"github.com/leostudio/kit/auth"
 	"testing"
 	"time"
 

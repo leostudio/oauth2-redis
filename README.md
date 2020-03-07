@@ -5,7 +5,7 @@ forked from [go-oauth2/redis](https://github.com/go-oauth2/redis), supported get
 ## Install
 
 ``` bash
-$ go get -u -v github.com/Ankr-network/oauth2-redis
+$ go get -u -v github.com/leostudio/oauth2-redis
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ package main
 
 import (
 	"github.com/go-redis/redis"
-	oredis "github.com/Ankr-network/oauth2-redis"
+	oredis "github.com/leostudio/oauth2-redis"
 	"gopkg.in/oauth2.v3/manage"
 )
 
