@@ -3,7 +3,6 @@ module github.com/leostudio/oauth2-redis
 go 1.13
 
 require (
-	github.com/Ankr-network/oauth2-redis v1.1.0 // indirect
 	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/json-iterator/go v1.1.8
 	github.com/leostudio/kit v0.1.0
